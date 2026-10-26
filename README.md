@@ -1,343 +1,549 @@
-# 🧩 TaskBoard — Semana 11
+# 🧩 TaskBoard — Semana 12
 
-[![Laravel](https://img.shields.io/badge/Laravel-12-red?logo=laravel)](https://laravel.com/)
-[![PHP](https://img.shields.io/badge/PHP-8.2-blue?logo=php)](https://www.php.net/)
-[![MySQL](https://img.shields.io/badge/MySQL-TaskBoard-blue?logo=mysql)](https://www.mysql.com/)
-[![UPED](https://img.shields.io/badge/UPED-Integración_de_Sistemas-0B2E59)](#)
+![Laravel](https://img.shields.io/badge/Laravel-12-red?logo=laravel)
+![PHP](https://img.shields.io/badge/PHP-8.2-blue?logo=php)
+![MySQL](https://img.shields.io/badge/MySQL-MariaDB-orange?logo=mysql)
+![UPED](https://img.shields.io/badge/UPED-Integración_de_Sistemas-0B2E59)
 
-Proyecto desarrollado para la asignatura **Integración de Sistemas** de la **Universidad Pedagógica de El Salvador**, correspondiente a la **Semana 11**.
+Proyecto desarrollado para la asignatura **Integración de Sistemas** de la **Universidad Pedagógica de El Salvador (UPED)**.
 
-## 👨‍💻 Estudiante
+Durante la Semana 12 se incorporó autenticación de usuarios, manejo de sesiones, protección de rutas y aislamiento de datos por usuario dentro de TaskBoard.
 
-**Josthyn Stanley Cruz Vásquez**  
-Ingeniería en Sistemas y Computación  
-Universidad Pedagógica de El Salvador
+**Estudiante:** Josthyn Stanley Cruz Vásquez  
+**Carrera:** Ingeniería en Sistemas y Computación  
+**Universidad:** Universidad Pedagógica de El Salvador  
+**Ciclo:** 02-2026  
+
+---
 
 ## 🎯 Objetivo de la semana
 
-Durante la Semana 11 se completó el CRUD de transacciones incorporando las operaciones de **editar** y **eliminar**, además de una nueva funcionalidad para cambiar rápidamente el estado de una transacción.
+Implementar un sistema de autenticación con registro, inicio y cierre de sesión, proteger las rutas de la aplicación y garantizar que cada usuario solamente pueda consultar y modificar sus propios comercios y transacciones.
 
-También se trabajó con integridad referencial, borrado en cascada y validación de transiciones válidas entre estados.
+---
 
-## ✅ Jueves — Actualizar y eliminar transacciones
+# 📅 Jueves — Cookies, sesiones y autenticación
 
-Se agregaron las operaciones necesarias para editar y eliminar transacciones existentes.
+## 🍪 Cookies y sesiones
 
-### Rutas de edición
+Se observó el funcionamiento de las cookies generadas por Laravel desde las herramientas del navegador.
 
-```php
-Route::get('/transacciones/{transaccion}/editar',
-    [TransaccionController::class, 'edit'])
-    ->name('transacciones.edit');
+Cookies verificadas:
 
-Route::put('/transacciones/{transaccion}',
-    [TransaccionController::class, 'update'])
-    ->name('transacciones.update');
-```
+- `laravel_session`
+- `XSRF-TOKEN`
 
-También se creó la vista:
+También se comprobó que al eliminar la cookie de sesión y recargar la página Laravel genera una nueva sesión.
 
-```text
-resources/views/transacciones/edit.blade.php
-```
+---
 
-El formulario aparece prellenado utilizando:
+## 👤 Modelo User
 
-```blade
-old('cliente_nombre', $transaccion->cliente_nombre)
-```
+Laravel ya incluía la migración inicial de usuarios y el modelo `User`.
 
-y:
-
-```blade
-old('monto', $transaccion->monto)
-```
-
-## 🔁 Reutilización del Form Request
-
-El método `update()` reutiliza el Form Request desarrollado durante la Semana 10:
+El modelo utiliza:
 
 ```php
-public function update(
-    GuardarTransaccionRequest $request,
-    Transaccion $transaccion
-) {
-    $transaccion->update($request->validated());
-
-    return redirect()
-        ->route('comercios.show', $transaccion->comercio_id)
-        ->with('mensaje', 'Transacción actualizada correctamente.');
-}
+protected $fillable = [
+    'name',
+    'email',
+    'password',
+];
 ```
 
-De esta forma, las mismas reglas utilizadas al crear una transacción también se reutilizan al editarla.
-
-## 🗑️ Eliminación de transacciones
-
-Se agregó la ruta:
+Los datos sensibles permanecen ocultos:
 
 ```php
-Route::delete('/transacciones/{transaccion}',
-    [TransaccionController::class, 'destroy'])
-    ->name('transacciones.destroy');
+protected $hidden = [
+    'password',
+    'remember_token',
+];
 ```
 
-Y el método:
+La contraseña utiliza hash automáticamente:
 
 ```php
-public function destroy(Transaccion $transaccion)
+protected function casts(): array
 {
-    $comercioId = $transaccion->comercio_id;
-    $cliente = $transaccion->cliente_nombre;
-
-    $transaccion->delete();
-
-    return redirect()
-        ->route('comercios.show', $comercioId)
-        ->with('mensaje', "Transacción de {$cliente} eliminada.");
+    return [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+    ];
 }
 ```
 
-Antes de eliminar se utiliza una confirmación desde la vista:
+---
 
-```blade
-onsubmit="return confirm('¿Eliminar esta transacción? Esta acción no se puede deshacer.')"
-```
+## 🔐 Comprobación del hash
 
-Se comprobó que al presionar **Cancelar** no se elimina nada y que al confirmar la transacción desaparece correctamente.
-
-## 🔗 Integridad referencial
-
-Se creó un `EventoTransaccion` asociado a una transacción y luego se intentó eliminar dicha transacción.
-
-La base de datos respondió con:
-
-```text
-SQLSTATE[23000]: Integrity constraint violation: 1451
-```
-
-Esto permitió comprobar que MySQL estaba protegiendo la relación entre:
-
-```text
-Transaccion → EventoTransaccion
-```
-
-## 🔥 Borrado en cascada
-
-Para permitir que los eventos relacionados se eliminen automáticamente junto con la transacción se modificó la llave foránea:
+Se realizaron pruebas desde Tinker:
 
 ```php
-$table->foreignId('transaccion_id')
-    ->constrained('transacciones')
+use Illuminate\Support\Facades\Hash;
+
+$h = Hash::make('secreto123');
+
+Hash::check('secreto123', $h);
+// true
+
+Hash::check('otra', $h);
+// false
+
+Hash::make('secreto123') === $h;
+// false
+```
+
+Esto permite comprobar que las contraseñas no se almacenan en texto plano.
+
+---
+
+## 📝 Registro de usuarios
+
+Se creó:
+
+```text
+app/Http/Requests/RegistroRequest.php
+```
+
+Validaciones principales:
+
+```php
+'name' => ['required', 'max:255'],
+'email' => ['required', 'email', 'unique:users,email'],
+'password' => ['required', 'min:8', 'confirmed'],
+```
+
+Después del registro el usuario inicia sesión automáticamente:
+
+```php
+Auth::login($user);
+$request->session()->regenerate();
+```
+
+---
+
+## 🔑 Login
+
+El inicio de sesión utiliza:
+
+```php
+Auth::attempt($credenciales, $request->boolean('recordar'));
+```
+
+Después de autenticarse se regenera la sesión:
+
+```php
+$request->session()->regenerate();
+```
+
+Y se utiliza:
+
+```php
+return redirect()->intended(route('comercios.index'));
+```
+
+para regresar al usuario a la ruta protegida que intentaba visitar.
+
+---
+
+## 🚪 Logout
+
+El cierre de sesión destruye la sesión actual y genera un nuevo token CSRF:
+
+```php
+Auth::logout();
+
+$request->session()->invalidate();
+$request->session()->regenerateToken();
+```
+
+---
+
+## 🛡️ Middleware auth y guest
+
+Las rutas de registro e inicio de sesión utilizan:
+
+```php
+Route::middleware('guest')->group(function () {
+    // registro y login
+});
+```
+
+Las rutas internas de TaskBoard utilizan:
+
+```php
+Route::middleware('auth')->group(function () {
+    // comercios y transacciones
+});
+```
+
+De esta manera un usuario sin sesión es enviado al login cuando intenta acceder a una ruta protegida.
+
+---
+
+## 👋 Barra superior dinámica
+
+El layout principal utiliza Blade para cambiar su contenido dependiendo de la sesión.
+
+```blade
+@auth
+    Hola, {{ Auth::user()->name }}
+@endauth
+
+@guest
+    <a href="{{ route('login') }}">Entrar</a>
+    <a href="{{ route('registro') }}">Registrarse</a>
+@endguest
+```
+
+También se agregó el botón para cerrar sesión.
+
+---
+
+## ✅ Pruebas realizadas el jueves
+
+Se verificó correctamente:
+
+- Registro con datos válidos.
+- Bloqueo de correo duplicado.
+- Contraseña mínima de 8 caracteres.
+- Validación de confirmación de contraseña.
+- Login con credenciales incorrectas.
+- Login correcto y redirección `intended`.
+- Redirección de `/comercios` hacia `/login` sin sesión.
+- Destrucción de la sesión después del logout.
+
+---
+
+# 📅 Viernes — Aislamiento por usuario
+
+## 🔗 Relación entre usuarios y comercios
+
+Se agregó `user_id` a la tabla `comercios`.
+
+```php
+$table->foreignId('user_id')
+    ->constrained('users')
     ->onDelete('cascade');
 ```
 
-Después se ejecutó:
-
-```bash
-php artisan migrate:fresh --seed
-```
-
-y se comprobó que la transacción podía eliminarse sin error junto con sus eventos asociados.
-
-## 🧪 Reto del jueves
-
-Se completó la **Misión B — Mensaje de éxito con detalle**.
-
-Ahora, después de eliminar una transacción, el sistema muestra el nombre del cliente:
-
-```text
-Transacción de Juan Pérez eliminada.
-```
-
-## ✅ Viernes — Mover estado de una transacción
-
-Durante la sesión del viernes se agregó una función específica para cambiar el estado de una transacción sin abrir el formulario completo de edición.
-
-## 🔀 Ruta PATCH
-
-Se agregó:
+Relación en `User`:
 
 ```php
-Route::patch('/transacciones/{transaccion}/mover/{estado}',
-    [TransaccionController::class, 'moverEstado'])
-    ->name('transacciones.mover');
+public function comercios()
+{
+    return $this->hasMany(Comercio::class);
+}
 ```
 
-La ruta utiliza `PATCH` porque solamente modifica una parte del recurso: el estado.
+Relación en `Comercio`:
 
-## 🚦 Estados disponibles
+```php
+public function usuario()
+{
+    return $this->belongsTo(User::class, 'user_id');
+}
+```
 
-Los estados utilizados en TaskBoard son:
+---
+
+## 🌱 Usuarios de prueba
+
+El `DatabaseSeeder` crea dos usuarios:
 
 ```text
-Iniciada
-Completada
-Fallida
+Ana
+ana@taskboard.test
+
+Carlos
+carlos@taskboard.test
 ```
 
-Las transiciones válidas definidas son:
+Contraseña utilizada:
+
+```text
+password123
+```
+
+Cada usuario posee un comercio distinto:
+
+```text
+Ana → Café Amanecer
+Carlos → Ferretería El Tornillo
+```
+
+---
+
+## 🏪 Comercios aislados por usuario
+
+El listado de comercios ahora parte del usuario autenticado:
+
+```php
+$comercios = Auth::user()
+    ->comercios()
+    ->withCount('transacciones')
+    ->orderBy('nombre_comercio')
+    ->get();
+```
+
+De esta forma cada usuario solamente puede visualizar sus propios comercios.
+
+---
+
+## 🚫 Protección contra acceso por ID
+
+Se agregó protección para impedir que un usuario acceda a un comercio ajeno modificando manualmente la URL.
+
+```php
+abort_unless(
+    $comercio->user_id === Auth::id(),
+    404
+);
+```
+
+Por ejemplo:
+
+```text
+Ana → /comercios/1 ✅
+Ana → /comercios/2 ❌ 404
+```
+
+---
+
+## 💳 Protección de transacciones
+
+Se creó un método central para autorizar transacciones:
+
+```php
+private function autorizar(Transaccion $transaccion): void
+{
+    abort_unless(
+        $transaccion->comercio->user_id === Auth::id(),
+        404
+    );
+}
+```
+
+La autorización se aplica antes de:
+
+- Mostrar una transacción.
+- Editarla.
+- Actualizarla.
+- Eliminarla.
+- Cambiar su estado.
+
+También se restringió la creación de transacciones a comercios propios.
+
+---
+
+## ✅ Validación segura de comercio
+
+`GuardarTransaccionRequest` verifica que el comercio exista y además pertenezca al usuario autenticado.
+
+```php
+Rule::exists('comercios', 'id')
+    ->where('user_id', $this->user()->id)
+```
+
+Esto evita que alguien modifique manualmente `comercio_id` para registrar o mover información hacia un comercio de otro usuario.
+
+---
+
+## 🔄 Cambio de estado protegido
+
+Se conservaron las reglas implementadas durante Semana 11:
 
 ```text
 Iniciada → Completada
 Iniciada → Fallida
 Fallida → Iniciada
+Completada → sin transición
 ```
 
-Una transacción `Completada` no puede regresar directamente a otro estado.
+Además ahora se verifica primero que la transacción pertenezca al usuario autenticado.
 
-## 🔘 Botones rápidos
+---
 
-Las transacciones con estado `Iniciada` muestran los botones:
+## 🧪 Pruebas de aislamiento
 
-```text
-Marcar Completada
-Marcar Fallida
-```
+Se utilizaron dos usuarios y diferentes sesiones para comprobar:
 
-Los botones utilizan formularios con:
+- Ana solamente ve Café Amanecer.
+- Carlos solamente ve Ferretería El Tornillo.
+- Ana no puede abrir el comercio de Carlos.
+- Carlos no puede abrir el comercio de Ana.
+- Una transacción ajena devuelve 404.
+- Una transacción ajena no puede editarse.
+- Una transacción ajena no puede eliminarse.
+- Una transacción ajena no puede cambiar de estado.
+- Las operaciones bloqueadas no modifican los datos.
+- Cada usuario puede crear transacciones en su propio comercio.
+- Sin sesión las rutas protegidas redirigen al login.
 
-```blade
-@method('PATCH')
-```
+---
 
-y permiten cambiar el estado sin abrir la pantalla de edición.
+## 🧰 Verificaciones con Tinker
 
-## ⚠️ Prueba de transición inválida
-
-Inicialmente se comprobó que el sistema permitía cambiar:
-
-```text
-Completada → Fallida
-```
-
-La prueba devolvió:
-
-```text
-true
-```
-
-demostrando que todavía faltaba una validación de negocio.
-
-## 🛡️ Validación de transiciones
-
-Se mejoró `moverEstado()` utilizando un mapa de transiciones:
+Se realizaron comprobaciones adicionales:
 
 ```php
-$transiciones = [
-    'Iniciada' => ['Completada', 'Fallida'],
-    'Completada' => [],
-    'Fallida' => ['Iniciada'],
-];
+Auth::attempt([
+    'email' => 'ana@taskboard.test',
+    'password' => 'password123'
+]);
+// true
 ```
-
-Antes de actualizar se verifica:
 
 ```php
-if (!in_array($estado, $transiciones[$transaccion->estado] ?? [])) {
-    abort(
-        400,
-        "No se puede mover de {$transaccion->estado} a {$estado}."
-    );
-}
+Comercio::where(
+    'user_id',
+    User::where('email', 'carlos@taskboard.test')->value('id')
+)->count();
+// 1
 ```
-
-También se bloquean estados inexistentes:
 
 ```php
-if (!in_array($estado, ['Iniciada', 'Completada', 'Fallida'])) {
-    abort(400, 'Estado no válido.');
-}
+Hash::check('password123', User::first()->password);
+// true
 ```
 
-## 🧪 Pruebas realizadas
+---
 
-Durante la Semana 11 se comprobaron los siguientes escenarios:
+## 🚦 Protección contra intentos repetidos de login
 
-- Formulario de edición prellenado.
-- Actualización correcta de nombre y monto.
-- Validación al dejar el monto vacío.
-- Confirmación antes de eliminar.
-- Cancelación del proceso de eliminación.
-- Eliminación correcta de transacciones.
-- Error de integridad referencial sin `cascade`.
-- Eliminación correcta utilizando `onDelete('cascade')`.
-- Error 404 al intentar editar una transacción inexistente.
-- Ruta `PATCH` para cambiar estado.
-- Cambio válido `Iniciada → Completada`.
-- Cambio inválido `Completada → Fallida`.
-- Bloqueo correcto de transiciones inválidas.
-- Bloqueo de estados inexistentes como `Cancelada`.
+La ruta POST de login fue protegida con `throttle`:
 
-## 💳 Flujo de actualización
+```php
+Route::post('/login', [AuthController::class, 'login'])
+    ->middleware('throttle:5,1')
+    ->name('login.attempt');
+```
+
+Esto permite un máximo de cinco intentos dentro de un minuto.
+
+En la prueba realizada, el sexto intento incorrecto respondió:
 
 ```text
-Comercio
-   ↓
-Editar transacción
-   ↓
-GuardarTransaccionRequest
-   ↓
-TransaccionController@update
-   ↓
-Eloquent / MySQL
-   ↓
-Redirección al comercio
-   ↓
-Mensaje de confirmación
+429 Too Many Requests
 ```
 
-## 🚦 Flujo de cambio de estado
+---
+
+# 🔐 Seguridad implementada
+
+Durante Semana 12 se aplicaron varias medidas de seguridad:
+
+- Contraseñas almacenadas mediante hash.
+- Regeneración del ID de sesión después del login.
+- Invalidación completa de sesión durante logout.
+- Protección CSRF mediante `@csrf`.
+- Middleware `auth` y `guest`.
+- Restricción de recursos por propietario.
+- Respuesta 404 ante recursos ajenos.
+- Validación de `comercio_id` en el servidor.
+- Límite de intentos de login mediante `throttle`.
+
+---
+
+# 🧱 Estructura principal trabajada
 
 ```text
-Panel del comercio
-   ↓
-Botón Marcar Completada / Fallida
-   ↓
-PATCH transacciones.mover
-   ↓
-TransaccionController@moverEstado
-   ↓
-Validación de transición
-   ↓
-Eloquent
-   ↓
-Actualización del estado
-   ↓
-Mensaje de confirmación
+app/
+├── Http/
+│   ├── Controllers/
+│   │   ├── AuthController.php
+│   │   ├── ComercioController.php
+│   │   └── TransaccionController.php
+│   └── Requests/
+│       ├── GuardarTransaccionRequest.php
+│       └── RegistroRequest.php
+├── Models/
+│   ├── Comercio.php
+│   ├── Transaccion.php
+│   └── User.php
+
+database/
+├── migrations/
+│   └── *_add_user_id_to_comercios.php
+└── seeders/
+    └── DatabaseSeeder.php
+
+resources/
+└── views/
+    ├── auth/
+    │   ├── login.blade.php
+    │   └── registro.blade.php
+    └── layouts/
+        └── app.blade.php
+
+routes/
+└── web.php
 ```
 
-## 🛠️ Tecnologías
+---
 
-- Laravel 12
+# 🛠️ Tecnologías utilizadas
+
+- Laravel
 - PHP 8.2
 - MySQL / MariaDB
 - Blade
 - Eloquent ORM
+- Laravel Authentication
+- Laravel Middleware
 - Form Requests
-- Route Model Binding
-- Métodos HTTP `PUT`, `DELETE` y `PATCH`
-- XAMPP
+- Tinker
 - Git
 - GitHub
+- XAMPP
 
-## ▶️ Ejecución del proyecto
+---
+
+# ▶️ Ejecución del proyecto
+
+Clonar el repositorio:
+
+```bash
+git clone https://github.com/StanleyJv/taskboard-semana12.git
+```
+
+Entrar al proyecto:
+
+```bash
+cd taskboard-semana12
+```
+
+Instalar dependencias:
+
+```bash
+composer install
+```
+
+Configurar el archivo `.env` y crear la base de datos.
+
+Ejecutar migraciones y seeders:
+
+```bash
+php artisan migrate:fresh --seed
+```
+
+Iniciar el servidor:
 
 ```bash
 php artisan serve
 ```
 
-Luego abrir:
+Abrir:
 
 ```text
-http://127.0.0.1:8000/comercios
+http://127.0.0.1:8000
 ```
 
-## 📂 Repositorio
+---
 
-```text
-https://github.com/StanleyJv/taskboard-semana11
-```
+# 🔗 Repositorio
+
+https://github.com/StanleyJv/taskboard-semana12
 
 ---
 
