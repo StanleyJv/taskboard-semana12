@@ -38,8 +38,9 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'mostrarLogin'])
         ->name('login');
 
-    Route::post('/login', [AuthController::class, 'login'])
-        ->name('login.attempt');
+Route::post('/login', [AuthController::class, 'login'])
+    ->middleware('throttle:5,1')
+    ->name('login.attempt');
 });
 
 /*

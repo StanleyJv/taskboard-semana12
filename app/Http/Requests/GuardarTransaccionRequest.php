@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class GuardarTransaccionRequest extends FormRequest
 {
@@ -14,7 +15,11 @@ class GuardarTransaccionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'comercio_id' => 'required|exists:comercios,id',
+            'comercio_id' => [
+                'required',
+                Rule::exists('comercios', 'id')
+                    ->where('user_id', $this->user()->id),
+            ],
             'cliente_nombre' => 'required|string|min:3|max:255',
             'monto' => 'required|numeric|min:0.01',
         ];
@@ -23,6 +28,7 @@ class GuardarTransaccionRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'comercio_id.exists' => 'El comercio seleccionado no es válido.',
             'cliente_nombre.required' => 'Debes indicar el nombre del cliente.',
             'cliente_nombre.min' => 'El nombre del cliente es demasiado corto.',
             'monto.required' => 'Debes indicar un monto.',
